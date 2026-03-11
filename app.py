@@ -283,41 +283,57 @@ def kpi_card(label, value):
 
 
 def current_user():
-    if not st.user.is_logged_in:
+    if st.session_state.get("authenticated") is not True:
         return None
 
-    email = getattr(st.user, "email", None) or "unknown@example.com"
-    name = getattr(st.user, "name", None) or email.split("@")[0]
+    display_name = st.session_state.get("display_name", "Invite")
+    username = st.session_state.get("username", "guest")
 
     users = load_users()
-    if email not in users:
-        users[email] = {
-            "display_name": name,
+    if username not in users:
+        users[username] = {
+            "display_name": display_name,
             "role": "admin" if len(users) == 0 else "membre",
             "created_at": datetime.now().isoformat(),
         }
         save_users(users)
 
     return {
-        "username": email,
-        "display_name": users[email].get("display_name", name),
-        "role": users[email].get("role", "membre"),
+        "username": username,
+        "display_name": users[username].get("display_name", display_name),
+        "role": users[username].get("role", "membre"),
     }
 
 
 def show_login():
-    hero("🏠 FoyerBudget", "Connectez-vous avec Google pour accéder à l'application.")
+    hero("🏠 FoyerBudget", "Entrez le mot de passe secret pour acceder a l'application.")
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.write("Connexion sécurisée")
-    if st.button("Se connecter avec Google", use_container_width=True, type="primary"):
-        st.login("google")
+
+    with st.form("secret_login"):
+        display_name = st.text_input("Prenom / surnom", placeholder="Ex: Loic")
+        password = st.text_input("Mot de passe", type="password")
+        submitted = st.form_submit_button("Entrer", use_container_width=True, type="primary")
+
+        if submitted:
+            expected_password = st.secrets["app_password"]
+            if password == expected_password:
+                safe_name = (display_name or "Invite").strip()
+                safe_key = safe_name.lower().replace(" ", "_")
+
+                st.session_state["authenticated"] = True
+                st.session_state["display_name"] = safe_name
+                st.session_state["username"] = safe_key
+                st.rerun()
+            else:
+                st.error("Mot de passe incorrect")
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 
 def show_sidebar():
     with st.sidebar:
         st.markdown("## 🏠 FoyerBudget")
-        st.caption(f"Connecté : {st.session_state.display_name}")
+        st.caption(f"Connecte : {st.session_state.display_name}")
         if st.session_state.role == "admin":
             st.caption("🛡️ Administrateur")
 
@@ -336,7 +352,9 @@ def show_sidebar():
         st.divider()
 
         if st.button("🚪 Déconnexion", use_container_width=True):
-            st.logout()
+            for key in ["authenticated", "display_name", "username", "role"]:
+                st.session_state.pop(key, None)
+            st.rerun()
 
     return page
 
@@ -349,7 +367,7 @@ def page_dashboard():
     budgets = load_budgets()
 
     if df.empty:
-        st.info("🎉 Commencez par ajouter une dépense.")
+        st.info("🎉 Commencez par ajouter une depense.")
         render_shell_end()
         return
 
@@ -364,7 +382,7 @@ def page_dashboard():
     with c1:
         kpi_card("💶 Foyer ce mois", f"{df_month['montant'].sum():.2f} €")
     with c2:
-        kpi_card("👤 Mes dépenses", f"{df_mine['montant'].sum():.2f} €")
+        kpi_card("👤 Mes depenses", f"{df_mine['montant'].sum():.2f} €")
     with c3:
         kpi_card("👫 Mon/Ta part", f"{df_mine['montant'].sum():.2f} / {partner_total:.2f} €")
     with c4:
@@ -385,7 +403,7 @@ def page_dashboard():
 
     col_a, col_b = st.columns(2)
     with col_a:
-        st.subheader("🏷️ Par catégorie")
+        st.subheader("🏷️ Par categorie")
         cat_data = df_month.groupby("categorie")["montant"].sum().sort_values(ascending=False)
         if not cat_data.empty:
             st.bar_chart(cat_data)
@@ -397,13 +415,13 @@ def page_dashboard():
         if not m_data.empty:
             st.bar_chart(m_data)
 
-    st.subheader("📈 Évolution mensuelle")
+    st.subheader("📈 Evolution mensuelle")
     df["mois"] = df["date"].dt.to_period("M").astype(str)
     monthly = df.groupby("mois")["montant"].sum().reset_index()
     monthly.columns = ["Mois", "Total (€)"]
     st.line_chart(monthly.set_index("Mois"))
 
-    st.subheader("🕐 Dernières dépenses")
+    st.subheader("🕐 Dernieres depenses")
     recent = df.sort_values("date", ascending=False).head(8).copy()
     recent["membre"] = recent["membre"].map(lambda member: users.get(member, {}).get("display_name", member))
     for _, row in recent.iterrows():
@@ -424,7 +442,7 @@ def page_dashboard():
 
 def page_add():
     render_shell_start()
-    hero("➕ Ajouter une dépense", "Saisie rapide.")
+    hero("➕ Ajouter une depense", "Saisie rapide.")
     users = load_users()
     members = {key: value["display_name"] for key, value in users.items()}
 
@@ -434,7 +452,7 @@ def page_add():
         with c1:
             date_val = st.date_input("📅 Date", value=date.today())
             montant = st.number_input("💶 Montant (€)", min_value=0.01, step=0.01, format="%.2f")
-            categorie = st.selectbox("🏷️ Catégorie", CATEGORIES)
+            categorie = st.selectbox("🏷️ Categorie", CATEGORIES)
         with c2:
             description = st.text_input("📝 Description", placeholder="Ex: Carrefour drive")
             others = [key for key in members if key != st.session_state.username]
@@ -446,7 +464,7 @@ def page_add():
 
         if st.form_submit_button("✅ Enregistrer", use_container_width=True, type="primary"):
             add_expense(date_val, montant, categorie, description, st.session_state.username, partage)
-            st.success(f"{montant:.2f} € enregistrés.")
+            st.success(f"{montant:.2f} € enregistres.")
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
     render_shell_end()
@@ -454,12 +472,12 @@ def page_add():
 
 def page_my_expenses():
     render_shell_start()
-    hero("📋 Mes dépenses", "Historique personnel.")
+    hero("📋 Mes depenses", "Historique personnel.")
     df = load_expenses()
     df = df[df["membre"] == st.session_state.username].copy()
 
     if df.empty:
-        st.info("Aucune dépense enregistrée pour vous.")
+        st.info("Aucune depense enregistree pour vous.")
         render_shell_end()
         return
 
@@ -468,8 +486,8 @@ def page_my_expenses():
     c1, c2, c3 = st.columns(3)
     months = sorted(df["date"].dt.to_period("M").astype(str).unique(), reverse=True)
     month_filter = c1.selectbox("📅 Mois", ["Tous"] + list(months))
-    category_filter = c2.selectbox("🏷️ Catégorie", ["Toutes"] + CATEGORIES)
-    sort_by = c3.selectbox("🔃 Trier par", ["Date (récent)", "Montant ↓"])
+    category_filter = c2.selectbox("🏷️ Categorie", ["Toutes"] + CATEGORIES)
+    sort_by = c3.selectbox("🔃 Trier par", ["Date (recent)", "Montant ↓"])
 
     if month_filter != "Tous":
         df = df[df["date"].dt.to_period("M").astype(str) == month_filter]
@@ -480,7 +498,7 @@ def page_my_expenses():
 
     k1, k2 = st.columns(2)
     with k1:
-        kpi_card("💶 Total filtré", f"{df['montant'].sum():.2f} €")
+        kpi_card("💶 Total filtre", f"{df['montant'].sum():.2f} €")
     with k2:
         kpi_card("📝 Nb transactions", str(len(df)))
 
@@ -508,13 +526,12 @@ def page_my_expenses():
 
 def page_shared():
     render_shell_start()
-    hero("👥 Dépenses partagées", "Remboursements et équilibre.")
+    hero("👥 Depenses partagees", "Remboursements et equilibre.")
     df = load_expenses()
-    users = load_users()
     me = st.session_state.username
 
     if df.empty:
-        st.info("Aucune dépense enregistrée.")
+        st.info("Aucune depense enregistree.")
         render_shell_end()
         return
 
@@ -538,7 +555,7 @@ def page_shared():
 
 def page_budgets():
     render_shell_start()
-    hero("🎯 Budgets", "Suivi par catégorie.")
+    hero("🎯 Budgets", "Suivi par categorie.")
     budgets = load_budgets()
     df = load_expenses()
     now = datetime.now()
@@ -550,7 +567,7 @@ def page_budgets():
     else:
         cat_spend = {}
 
-    with st.expander("✏️ Définir / modifier les budgets mensuels", expanded=len(budgets) == 0):
+    with st.expander("✏️ Definir / modifier les budgets mensuels", expanded=len(budgets) == 0):
         with st.form("budget_form"):
             new_budgets = {}
             cols = st.columns(2)
@@ -561,18 +578,18 @@ def page_budgets():
                         new_budgets[cat] = val
             if st.form_submit_button("💾 Enregistrer les budgets", use_container_width=True, type="primary"):
                 save_budgets(new_budgets)
-                st.success("Budgets enregistrés !")
+                st.success("Budgets enregistres !")
                 st.rerun()
 
     if not budgets:
-        st.info("Définissez vos budgets pour commencer le suivi.")
+        st.info("Definissez vos budgets pour commencer le suivi.")
         render_shell_end()
         return
 
     days_in_month = calendar.monthrange(now.year, now.month)[1]
     days_elapsed = now.day
     month_pct = days_elapsed / days_in_month * 100
-    st.caption(f"📅 Jour {days_elapsed}/{days_in_month} du mois ({month_pct:.0f}% écoulé)")
+    st.caption(f"📅 Jour {days_elapsed}/{days_in_month} du mois ({month_pct:.0f}% ecoule)")
 
     total_budget = sum(budgets.values())
     total_spent = sum(cat_spend.get(c, 0) for c in budgets)
@@ -585,7 +602,7 @@ def page_budgets():
         spent = cat_spend.get(cat, 0)
         remaining = budget - spent
         pct = (spent / budget * 100) if budget > 0 else 0
-        status = "🔴 Dépassé !" if pct >= 100 else "🟡 Attention" if pct >= 75 else "✅ OK"
+        status = "🔴 Depasse !" if pct >= 100 else "🟡 Attention" if pct >= 75 else "✅ OK"
 
         st.markdown(f"""
         <div class="{card_class(pct)}">
@@ -594,9 +611,9 @@ def page_budgets():
                 <span style="font-size:.85rem;color:#64748B">{status}</span>
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:4px">
-                <span><b>{spent:.2f} €</b> dépensés</span>
+                <span><b>{spent:.2f} €</b> depenses</span>
                 <span style="color:{'#EF4444' if remaining < 0 else '#10B981'}">
-                    {abs(remaining):.2f} € {'de dépassement' if remaining < 0 else 'restants'}
+                    {abs(remaining):.2f} € {'de depassement' if remaining < 0 else 'restants'}
                 </span>
             </div>
             {progress_bar(pct)}
@@ -611,13 +628,11 @@ def page_budgets():
 
 def page_rapport():
     render_shell_start()
-    hero("📅 Rapport mensuel", "Synthèse détaillée du mois.")
+    hero("📅 Rapport mensuel", "Synthese detaillee du mois.")
     df = load_expenses()
-    users = load_users()
-    budgets = load_budgets()
 
     if df.empty:
-        st.info("Aucune dépense enregistrée.")
+        st.info("Aucune depense enregistree.")
         render_shell_end()
         return
 
@@ -629,7 +644,7 @@ def page_rapport():
     df_m = df[(df["date"].dt.month == month) & (df["date"].dt.year == year)]
 
     if df_m.empty:
-        st.warning("Aucune dépense pour ce mois.")
+        st.warning("Aucune depense pour ce mois.")
         render_shell_end()
         return
 
@@ -637,45 +652,30 @@ def page_rapport():
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        kpi_card("💶 Total dépensé", f"{total:.2f} €")
+        kpi_card("💶 Total depense", f"{total:.2f} €")
     with c2:
         kpi_card("📝 Nb transactions", str(len(df_m)))
     with c3:
         kpi_card("📆 Moyenne / jour", f"{total / max(df_m['date'].dt.day.max(), 1):.2f} €")
-
-    st.subheader("👥 Répartition par membre")
-    membre_totals = df_m.groupby("membre")["montant"].sum()
-    for uname, amt in membre_totals.items():
-        dname = users.get(uname, {}).get("display_name", uname)
-        pct = amt / total * 100 if total > 0 else 0
-        st.markdown(f"""
-        <div class="card">
-            <div style="display:flex;justify-content:space-between">
-                <b>👤 {dname}</b>
-                <b>{amt:.2f} € ({pct:.1f}%)</b>
-            </div>
-            {progress_bar(pct)}
-        </div>
-        """, unsafe_allow_html=True)
 
     render_shell_end()
 
 
 def page_settings():
     render_shell_start()
-    hero("⚙️ Paramètres", "Profil et export.")
+    hero("⚙️ Parametres", "Profil et export.")
     users = load_users()
     me = st.session_state.username
 
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     with st.form("profile"):
-        new_display = st.text_input("Prénom / Surnom", value=users[me]["display_name"])
-        if st.form_submit_button("💾 Mettre à jour", type="primary"):
+        new_display = st.text_input("Prenom / surnom", value=users[me]["display_name"])
+        if st.form_submit_button("💾 Mettre a jour", type="primary"):
             if new_display:
                 users[me]["display_name"] = new_display
                 st.session_state.display_name = new_display
             save_users(users)
-            st.success("Profil mis à jour !")
+            st.success("Profil mis a jour !")
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
