@@ -6,7 +6,6 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-# Config
 st.set_page_config(
     page_title="FoyerBudget",
     page_icon="🏠",
@@ -28,124 +27,52 @@ CATEGORIES = [
     "🎬 Loisirs", "🏫 Éducation", "🚌 Transport", "🐾 Animaux", "📦 Autre"
 ]
 
-MONTHS_FR = [
-    "", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
-]
-
 st.markdown("""
 <style>
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 3rem;
-        max-width: 1200px;
-    }
+    .block-container { padding-top: 1rem; padding-bottom: 3rem; max-width: 1200px; }
     .app-shell {
         background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F7 100%);
-        border-radius: 22px;
-        padding: 1.1rem;
-        margin-bottom: 1rem;
+        border-radius: 22px; padding: 1.1rem; margin-bottom: 1rem;
         border: 1px solid rgba(15, 23, 42, 0.06);
     }
     .hero {
         background: linear-gradient(135deg, #0F172A 0%, #1D4ED8 55%, #38BDF8 100%);
-        color: white;
-        border-radius: 22px;
-        padding: 1.4rem 1.3rem;
-        margin-bottom: 1rem;
+        color: white; border-radius: 22px; padding: 1.4rem 1.3rem; margin-bottom: 1rem;
         box-shadow: 0 10px 30px rgba(37, 99, 235, 0.18);
     }
-    .hero-title {
-        font-size: 2rem;
-        font-weight: 800;
-        line-height: 1.05;
-        margin: 0;
-    }
-    .hero-sub {
-        margin-top: .45rem;
-        color: rgba(255,255,255,.88);
-        font-size: .98rem;
-    }
+    .hero-title { font-size: 2rem; font-weight: 800; line-height: 1.05; margin: 0; }
+    .hero-sub { margin-top: .45rem; color: rgba(255,255,255,.88); font-size: .98rem; }
     .glass-card {
-        background: rgba(255,255,255,.86);
-        backdrop-filter: blur(8px);
-        border-radius: 18px;
-        padding: 1rem 1rem;
-        border: 1px solid rgba(15, 23, 42, 0.06);
-        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
-        margin-bottom: .9rem;
+        background: rgba(255,255,255,.86); backdrop-filter: blur(8px);
+        border-radius: 18px; padding: 1rem; border: 1px solid rgba(15, 23, 42, 0.06);
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06); margin-bottom: .9rem;
     }
     .kpi-card {
-        background: white;
-        border-radius: 18px;
-        padding: 1rem;
+        background: white; border-radius: 18px; padding: 1rem;
         border: 1px solid rgba(15, 23, 42, 0.06);
         box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
     }
-    .kpi-label {
-        color: #64748B;
-        font-size: .86rem;
-        margin-bottom: .2rem;
-    }
-    .kpi-value {
-        font-size: 1.6rem;
-        font-weight: 800;
-        color: #0F172A;
-    }
+    .kpi-label { color: #64748B; font-size: .86rem; margin-bottom: .2rem; }
+    .kpi-value { font-size: 1.6rem; font-weight: 800; color: #0F172A; }
     .expense-card {
-        background: white;
-        border-radius: 16px;
-        padding: .95rem 1rem;
+        background: white; border-radius: 16px; padding: .95rem 1rem;
         border: 1px solid rgba(15, 23, 42, 0.06);
-        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
-        margin-bottom: .75rem;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05); margin-bottom: .75rem;
     }
-    .expense-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: .8rem;
-    }
-    .expense-cat {
-        font-weight: 700;
-        color: #0F172A;
-    }
-    .expense-amt {
-        font-weight: 800;
-        color: #111827;
-    }
-    .expense-meta {
-        margin-top: .35rem;
-        font-size: .9rem;
-        color: #64748B;
-    }
-    .prog-wrap {
-        background:#E5E7EB;
-        border-radius:999px;
-        height:10px;
-        margin-top:8px;
-        overflow:hidden;
-    }
-    .prog-fill {
-        height:10px;
-        border-radius:999px;
-        transition: width .4s;
-    }
+    .expense-top { display: flex; justify-content: space-between; align-items: center; gap: .8rem; }
+    .expense-cat { font-weight: 700; color: #0F172A; }
+    .expense-amt { font-weight: 800; color: #111827; }
+    .expense-meta { margin-top: .35rem; font-size: .9rem; color: #64748B; }
+    .prog-wrap { background:#E5E7EB; border-radius:999px; height:10px; margin-top:8px; overflow:hidden; }
+    .prog-fill { height:10px; border-radius:999px; transition: width .4s; }
     .card {
-        background: white;
-        border-radius: 16px;
-        padding: 1rem 1rem;
-        margin-bottom: .8rem;
-        border-left: 4px solid #2563EB;
-        border: 1px solid rgba(15, 23, 42, 0.06);
+        background: white; border-radius: 16px; padding: 1rem; margin-bottom: .8rem;
+        border-left: 4px solid #2563EB; border: 1px solid rgba(15, 23, 42, 0.06);
         box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
     }
     .card-warn { border-left-color: #F59E0B; }
     .card-danger { border-left-color: #EF4444; }
     .card-ok { border-left-color: #10B981; }
-    [data-testid="stMetricValue"] {
-        font-size: 1.45rem !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -153,11 +80,35 @@ st.markdown("""
 def load_users():
     if not USERS_FILE.exists():
         return {}
-    return json.loads(USERS_FILE.read_text(encoding="utf-8"))
+    raw = USERS_FILE.read_text(encoding="utf-8").strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except json.JSONDecodeError:
+        return {}
 
 
 def save_users(users):
     USERS_FILE.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_budgets():
+    if not BUDGETS_FILE.exists():
+        return {}
+    raw = BUDGETS_FILE.read_text(encoding="utf-8").strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def save_budgets(budgets):
+    BUDGETS_FILE.write_text(json.dumps(budgets, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def load_expenses():
@@ -211,23 +162,12 @@ def add_expense(date_val, montant, categorie, desc, membre, partage):
         "membre": membre,
         "partage": json.dumps(partage, ensure_ascii=False),
     }])
-
     save_expenses(pd.concat([df, row], ignore_index=True))
 
 
 def delete_expense(eid):
     df = load_expenses()
     save_expenses(df[df["id"] != eid])
-
-
-def load_budgets():
-    if not BUDGETS_FILE.exists():
-        return {}
-    return json.loads(BUDGETS_FILE.read_text(encoding="utf-8"))
-
-
-def save_budgets(budgets):
-    BUDGETS_FILE.write_text(json.dumps(budgets, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def parse_partage(value):
@@ -319,7 +259,6 @@ def show_login():
             if password == expected_password:
                 safe_name = (display_name or "Invite").strip()
                 safe_key = safe_name.lower().replace(" ", "_")
-
                 st.session_state["authenticated"] = True
                 st.session_state["display_name"] = safe_name
                 st.session_state["username"] = safe_key
@@ -456,11 +395,7 @@ def page_add():
         with c2:
             description = st.text_input("📝 Description", placeholder="Ex: Carrefour drive")
             others = [key for key in members if key != st.session_state.username]
-            partage = st.multiselect(
-                "👥 Partager avec",
-                options=others,
-                format_func=lambda x: members[x],
-            )
+            partage = st.multiselect("👥 Partager avec", options=others, format_func=lambda x: members[x])
 
         if st.form_submit_button("✅ Enregistrer", use_container_width=True, type="primary"):
             add_expense(date_val, montant, categorie, description, st.session_state.username, partage)
@@ -482,7 +417,6 @@ def page_my_expenses():
         return
 
     df["date"] = pd.to_datetime(df["date"])
-
     c1, c2, c3 = st.columns(3)
     months = sorted(df["date"].dt.to_period("M").astype(str).unique(), reverse=True)
     month_filter = c1.selectbox("📅 Mois", ["Tous"] + list(months))
